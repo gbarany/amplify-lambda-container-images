@@ -1,0 +1,228 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "env": {
+      "Type": "String"
+    },
+    "amplifyAppId": {
+      "Type": "String",
+      "Default": "<INJECTED_BY_HOOKS>"
+    },
+    "functionName": {
+      "Type": "String",
+      "Default": "mybiglambda"
+    },
+    "repositoryName": {
+      "Type": "String",
+      "Default": "<INJECTED_BY_HOOKS>"
+    },
+    "imageTag": {
+      "Type": "String",
+      "Default": "<INJECTED_BY_HOOKS>"
+    }
+  },
+  "Conditions": {
+    "ShouldNotCreateEnvResources": {
+      "Fn::Equals": [
+        {
+          "Ref": "env"
+        },
+        "NONE"
+      ]
+    }
+  },
+  "Resources": {
+    "MyLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::If": [
+            "ShouldNotCreateEnvResources",
+            {
+              "Fn::Sub": [
+                "amplify-${amplifyAppId}-${functionName}",
+                {
+                  "amplifyAppId": {
+                    "Ref": "amplifyAppId"
+                  },
+                  "functionName": {
+                    "Ref": "functionName"
+                  }
+                }
+              ]
+            },
+            {
+              "Fn::Sub": [
+                "amplify-${amplifyAppId}-${functionName}-${env}",
+                {
+                  "amplifyAppId": {
+                    "Ref": "amplifyAppId"
+                  },
+                  "functionName": {
+                    "Ref": "functionName"
+                  },
+                  "env": {
+                    "Ref": "env"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "PackageType": "Image",
+        "Environment": {
+          "Variables": {
+            "ENV": {
+              "Ref": "env"
+            },
+            "AMPLIFY_APP_ID": {
+              "Ref": "amplifyAppId"
+            },
+            "FUNCTION_NAME": {
+              "Ref": "functionName"
+            }
+          }
+        },
+        "Code": {
+          "ImageUri": {
+            "Fn::Sub": [
+              "${AccountId}.dkr.ecr.${Region}.amazonaws.com/${repositoryName}:${imageTag}",
+              {
+                "AccountId": {
+                  "Ref": "AWS::AccountId"
+                },
+                "Region": {
+                  "Ref": "AWS::Region"
+                },
+                "repositoryName": {
+                  "Ref": "repositoryName"
+                },
+                "imageTag": {
+                  "Ref": "imageTag"
+                }
+              }
+            ]
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaExecutionRole",
+            "Arn"
+          ]
+        },
+        "MemorySize": 128,
+        "Timeout": 120,
+        "Architectures": [
+          "x86_64"
+        ]
+      }
+    },
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::If": [
+            "ShouldNotCreateEnvResources",
+            {
+              "Fn::Sub": [
+                "amplify-${amplifyAppId}-${functionName}-lambdaRole",
+                {
+                  "amplifyAppId": {
+                    "Ref": "amplifyAppId"
+                  },
+                  "functionName": {
+                    "Ref": "functionName"
+                  }
+                }
+              ]
+            },
+            {
+              "Fn::Sub": [
+                "amplify-${amplifyAppId}-${functionName}-${env}-lambdaRole",
+                {
+                  "amplifyAppId": {
+                    "Ref": "amplifyAppId"
+                  },
+                  "functionName": {
+                    "Ref": "functionName"
+                  },
+                  "env": {
+                    "Ref": "env"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "accessSSMParameters",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ssm:GetParameter",
+                    "ssm:GetParameters"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        ":",
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        ":parameter",
+                        {
+                          "Fn::Sub": [
+                            "/amplify/${appId}/${env}/${functionName}/",
+                            {
+                              "appId": {
+                                "Ref": "amplifyAppId"
+                              },
+                              "env": {
+                                "Ref": "env"
+                              },
+                              "functionName": {
+                                "Ref": "functionName"
+                              }
+                            }
+                          ]
+                        },
+                        "*"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {},
+  "Description": "{\"createdOn\":\"Mac\",\"createdBy\":\"Amplify\",\"createdWith\":\"12.4.0\",\"stackType\":\"custom-customCloudformation\",\"metadata\":{}}"
+}
